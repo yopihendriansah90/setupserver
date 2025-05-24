@@ -1,14 +1,23 @@
 #!/bin/bash
 
-echo "=== 🛠️  Setup IP Statis untuk Ubuntu Server ==="
+echo "=== ⚙️ Setting IP Statis dengan Netplan ==="
 
-read -p "🧾 Masukkan nama interface jaringan (contoh: enp0s3, eth0, ens33): " iface
-read -p "🌐 Masukkan IP statis yang ingin digunakan (contoh: 192.168.1.100): " ipaddr
-read -p "🧱 Masukkan subnet prefix (contoh: 24 untuk 255.255.255.0): " prefix
-read -p "🚪 Masukkan default gateway (contoh: 192.168.1.1): " gateway
-read -p "🧭 Masukkan DNS server (contoh: 8.8.8.8,8.8.4.4): " dns
+# Interface default
+iface="enp0s3"
 
-# Mencari file konfigurasi netplan
+# Input IP Address
+read -p "Masukkan IP statis (default: 192.168.18.200/24): " ipaddr
+ipaddr=${ipaddr:-192.168.18.200/24}
+
+# Input Gateway
+read -p "Masukkan Gateway (default: 192.168.18.1): " gateway
+gateway=${gateway:-192.168.18.1}
+
+# Input DNS
+read -p "Masukkan DNS (default: 8.8.8.8,8.8.4.8): " dns
+dns=${dns:-8.8.8.8,8.8.4.8}
+
+# Ambil file YAML netplan
 yaml_file=$(find /etc/netplan -name "*.yaml" | head -n 1)
 
 if [ -z "$yaml_file" ]; then
@@ -16,10 +25,12 @@ if [ -z "$yaml_file" ]; then
     exit 1
 fi
 
-# Backup dulu sebelum ngedit
+echo "📁 Menggunakan file konfigurasi: $yaml_file"
+
+# Backup dulu
 sudo cp "$yaml_file" "$yaml_file.bak"
 
-# Menulis ulang konfigurasi netplan
+# Tulis konfigurasi baru
 sudo tee "$yaml_file" > /dev/null <<EOF
 network:
   version: 2
@@ -28,17 +39,20 @@ network:
     $iface:
       dhcp4: no
       addresses:
-        - $ipaddr/$prefix
-      gateway4: $gateway
+        - $ipaddr
+      routes:
+        - to: default
+          via: $gateway
       nameservers:
         addresses: [${dns//,/\, }]
 EOF
 
-echo "✅ Konfigurasi berhasil disimpan ke $yaml_file"
-echo "📡 Menerapkan konfigurasi jaringan..."
+echo "✅ Konfigurasi berhasil ditulis."
 
-# Terapkan perubahan
+# Terapkan konfigurasi
+echo "📡 Menerapkan konfigurasi baru..."
 sudo netplan apply
 
-echo "✅ IP statis sudah diterapkan ke interface $iface"
+# Tampilkan hasil
+echo "🔍 IP saat ini:"
 ip a show $iface
